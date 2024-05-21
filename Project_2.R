@@ -4,7 +4,6 @@ library(tidyr)
 library(reshape2) # reshaping the data 
 library(corrplot) # correlation matrix 
 library(car) # applied regression 
-
 data_1 <- read.csv(file = "./salary_data_cleaned.csv") #  Glassdoor data
 data_2 <- read.csv(file = "./glassdoor_jobs.csv") #  Glassdoor data 
 data_3 <- read.csv(file = "./eda_data.csv") #  data science job postings from Glassdoor.com for 2017-2018 (33 variables)
@@ -44,6 +43,16 @@ length(unique(data_1$Sector))
 length(unique(data_1$Job.Title))
 # how many different states in data_1
 length(unique(data_1$job_state))
+
+# there are some hourly salaries mixed in with yearly, we need to convert it in column avg_salary, it's correct in min_salary and max_salary
+table(data_3$hourly)
+h_to_y <- function(data) {
+  hourly = data$hourly == 1
+  data$avg_salary[hourly] <- (data$min_salary[hourly] + data$max_salary[hourly])/2
+  return(data)
+}
+data_1 <- h_to_y(data_1)
+data_3 <- h_to_y(data_3)
 
 # heat map to see the correlation between variables 
 # create a subset for data_1 with numeric variables only
@@ -316,5 +325,64 @@ data_3 %>% filter(Revenue %in% revenue_categories) %>%
         plot.margin = margin(5,0,0,10),
         legend.text = element_text(size = 9)
   )
+data_3 %>% group_by(Sector) %>%  filter(!(Sector == -1)) %>%
+  summarize(avg_salary = mean(avg_salary)) %>%
+  arrange(desc(avg_salary)) %>% slice_head(n=10) %>%
+  ggplot(aes(x = Sector, y = avg_salary)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Highest Salaries by Sector",
+       x = "Sector",
+       y = "Salary") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+table(data_4$work_year)
+table(data_4$company_size)
+# plot salary by employment type
+data_4 %>%
+  group_by(employment_type) %>%
+  summarize(avg_salary = mean(salary_in_usd)) %>%
+  ggplot(aes(x = employment_type, y = avg_salary)) +
+  geom_bar(stat = "identity", fill = "purple") +
+  labs(title = "Average Salary by Employment Type",
+       x = "Employment Type",
+       y = "Average Salary (USD)") +
+  theme_minimal()+
+  scale_x_discrete(labels = c("FT" = "Full-time", "PT" = "Part-time", "CT" = "Contract", "FL" = "Freelance"))
+
+
+# Salary by company size and experience level 
+data_4 %>%  
+  group_by(experience_level, company_size) %>% summarize(avg_salary = mean(salary_in_usd),.groups = "drop") %>%
+  ggplot() +
+  geom_bar(mapping = aes(x= company_size, y= avg_salary, fill =avg_salary),
+           stat = "identity", position = "dodge") +
+  labs(title = "Salary for Experience level by Company Size", x = "Company Size", y= "Salary in USD") +
+  facet_wrap(~experience_level, nrow = 1) +
+  scale_y_discrete(labels = scales::comma) +
+  scale_fill_continuous(labels = scales::comma) +
+  scale_x_discrete(labels = c("EN" = "entry-level", "EX" = "executive-level", "MI" = "mid-level", "SE" = "executive-level"))
+
+
+data_4 %>% 
+  group_by(experience_level) %>% summarize(avg_salary = mean(salary_in_usd), .groups = "drop") %>%
+  ggplot(aes(experience_level, avg_salary, fill=avg_salary))+
+  geom_bar(stat = "identity", na.rm = T )+
+  labs(title = "2020-2024 Salary by Experience Level", x = "Experience Level", y = "Salary (US Dollars)")
+
+
+data_4 %>% 
+  group_by(experience_level, work_year) %>% 
+  summarize(avg_salary = mean(salary_in_usd), .groups = "drop") %>%
+  ggplot(aes(experience_level,avg_salary , fill=avg_salary))+
+  geom_bar(stat = "identity", na.rm = T )+
+  labs(title = "Salary per year by Experience Level", x = "Experience Level", y = "Salary (US Dollars)")+
+  facet_wrap(~work_year)+
+  theme(legend.position="none",
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+
 
 
